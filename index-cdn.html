@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS Particle Viewer - Working Version</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div id="three-container"></div>
+    
+    <!-- Load Three.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Inline application code -->
+    <script>
+        console.log('🔬 Loading ATLAS Particle Viewer...');
+        
+        // Check if Three.js is loaded
+        if (typeof THREE === 'undefined') {
+            console.error('Three.js not loaded');
+            document.body.innerHTML = '<div style="color: red; text-align: center; padding: 50px;">Three.js failed to load</div>';
+        } else {
+            console.log('✓ Three.js loaded:', THREE.REVISION);
+            
+            // Simple Three.js scene setup
+            class SimpleParticleViewer {
+                constructor() {
+                    this.init();
+                }
+                
+                init() {
+                    console.log('Initializing viewer...');
+                    
+                    // Container
+                    const container = document.getElementById('three-container');
+                    
+                    // Scene
+                    this.scene = new THREE.Scene();
+                    this.scene.background = new THREE.Color(0x0a0a0a);
+                    
+                    // Camera
+                    this.camera = new THREE.PerspectiveCamera(
+                        75, 
+                        window.innerWidth / window.innerHeight, 
+                        0.1, 
+                        1000
+                    );
+                    this.camera.position.set(5, 3, 8);
+                    
+                    // Renderer
+                    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    container.appendChild(this.renderer.domElement);
+                    
+                    // Controls
+                    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                    this.controls.enableDamping = true;
+                    this.controls.dampingFactor = 0.05;
+                    this.controls.minDistance = 2;
+                    this.controls.maxDistance = 50;
+                    
+                    // Lighting
+                    this.setupLighting();
+                    
+                    // Create detector
+                    this.createDetector();
+                    
+                    // Load sample data
+                    this.loadSampleData();
+                    
+                    // Start animation
+                    this.animate();
+                    
+                    // Handle resize
+                    window.addEventListener('resize', () => this.onWindowResize());
+                    
+                    console.log('✅ Particle viewer initialized');
+                }
+                
+                setupLighting() {
+                    // Ambient light
+                    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                    this.scene.add(ambientLight);
+                    
+                    // Main light
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                    directionalLight.position.set(10, 10, 5);
+                    directionalLight.castShadow = true;
+                    this.scene.add(directionalLight);
+                    
+                    // Fill light
+                    const directionalLight2 = new THREE.DirectionalLight(0x8888ff, 0.3);
+                    directionalLight2.position.set(-5, 5, -5);
+                    this.scene.add(directionalLight2);
+                    
+                    // Vertex light
+                    const pointLight = new THREE.PointLight(0xffffff, 0.5, 10);
+                    pointLight.position.set(0, 0, 0);
+                    this.scene.add(pointLight);
+                }
+                
+                createDetector() {
+                    console.log('Creating detector geometry...');
+                    
+                    // Inner tracker (blue)
+                    const innerGeometry = new THREE.CylinderGeometry(1.0, 1.0, 6, 32, 1, true);
+                    const innerMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0x4169E1, 
+                        transparent: true, 
+                        opacity: 0.3,
+                        side: THREE.DoubleSide 
+                    });
+                    const innerTracker = new THREE.Mesh(innerGeometry, innerMaterial);
+                    this.scene.add(innerTracker);
+
+                    // EM Calorimeter (green)
+                    const emGeometry = new THREE.CylinderGeometry(2.2, 2.2, 6, 32, 1, true);
+                    const emMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0x32CD32, 
+                        transparent: true, 
+                        opacity: 0.25,
+                        side: THREE.DoubleSide 
+                    });
+                    const emCalorimeter = new THREE.Mesh(emGeometry, emMaterial);
+                    this.scene.add(emCalorimeter);
+
+                    // Hadronic Calorimeter (red)
+                    const hadGeometry = new THREE.CylinderGeometry(3.5, 3.5, 6, 32, 1, true);
+                    const hadMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0xFF6347, 
+                        transparent: true, 
+                        opacity: 0.2,
+                        side: THREE.DoubleSide 
+                    });
+                    const hadCalorimeter = new THREE.Mesh(hadGeometry, hadMaterial);
+                    this.scene.add(hadCalorimeter);
+
+                    // Muon system (purple)
+                    const muonGeometry = new THREE.CylinderGeometry(5.5, 5.5, 8, 32, 1, true);
+                    const muonMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0x9370DB, 
+                        transparent: true, 
+                        opacity: 0.15,
+                        side: THREE.DoubleSide 
+                    });
+                    const muonBarrel = new THREE.Mesh(muonGeometry, muonMaterial);
+                    this.scene.add(muonBarrel);
+                    
+                    console.log('✓ Detector created');
+                }
+                
+                loadSampleData() {
+                    console.log('Loading sample particle tracks...');
+                    
+                    // Try to load from sample-data/event-001.json
+                    fetch('./sample-data/event-001.json')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('✓ Sample data loaded:', data.event_id);
+                            this.createParticleTracks(data.particles);
+                        })
+                        .catch(error => {
+                            console.warn('Could not load sample data, creating fallback:', error);
+                            this.createFallbackTracks();
+                        });
+                }
+                
+                createFallbackTracks() {
+                    const fallbackParticles = [
+                        {
+                            type: 'electron',
+                            trajectory: [
+                                { x: 0, y: 0, z: 0 },
+                                { x: 0.2, y: -0.1, z: 0.3 },
+                                { x: 0.4, y: -0.2, z: 0.6 },
+                                { x: 0.6, y: -0.3, z: 0.9 },
+                                { x: 0.8, y: -0.4, z: 1.2 }
+                            ]
+                        },
+                        {
+                            type: 'muon',
+                            trajectory: [
+                                { x: 0, y: 0, z: 0 },
+                                { x: -0.15, y: 0.25, z: -0.2 },
+                                { x: -0.3, y: 0.5, z: -0.4 },
+                                { x: -0.45, y: 0.75, z: -0.6 },
+                                { x: -0.6, y: 1.0, z: -0.8 }
+                            ]
+                        },
+                        {
+                            type: 'photon',
+                            trajectory: [
+                                { x: 0, y: 0, z: 0 },
+                                { x: 0.12, y: 0.08, z: 0.2 },
+                                { x: 0.24, y: 0.16, z: 0.4 },
+                                { x: 0.36, y: 0.24, z: 0.6 }
+                            ]
+                        }
+                    ];
+                    
+                    this.createParticleTracks(fallbackParticles);
+                }
+                
+                createParticleTracks(particles) {
+                    console.log(`Creating ${particles.length} particle tracks...`);
+                    
+                    const colors = {
+                        electron: 0x00FF00,
+                        positron: 0x00FF88,
+                        muon: 0xFF0000,
+                        photon: 0xFFFF00,
+                        pion_plus: 0x0080FF,
+                        pion_minus: 0x8000FF,
+                        default: 0xCCCCCC
+                    };
+                    
+                    particles.forEach((particle, index) => {
+                        if (!particle.trajectory || particle.trajectory.length < 2) {
+                            return;
+                        }
+                        
+                        const points = particle.trajectory.map(point => 
+                            new THREE.Vector3(point.x, point.y, point.z)
+                        );
+                        
+                        const color = colors[particle.type] || colors.default;
+                        
+                        // Create tube geometry for the track
+                        const curve = new THREE.CatmullRomCurve3(points);
+                        const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, 0.02, 8, false);
+                        const tubeMaterial = new THREE.MeshLambertMaterial({
+                            color: color,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                        this.scene.add(tubeMesh);
+                    });
+                    
+                    // Add collision vertex
+                    const vertexGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+                    const vertexMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                    const vertexPoint = new THREE.Mesh(vertexGeometry, vertexMaterial);
+                    this.scene.add(vertexPoint);
+                    
+                    console.log('✓ Particle tracks created');
+                }
+                
+                animate() {
+                    requestAnimationFrame(() => this.animate());
+                    this.controls.update();
+                    this.renderer.render(this.scene, this.camera);
+                }
+                
+                onWindowResize() {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+            }
+            
+            // Initialize the application
+            const app = new SimpleParticleViewer();
+            window.atlasViewer = app; // Make globally available for debugging
+        }
+    </script>
+</body>
+</html>

@@ -36,18 +36,23 @@ class AtlasParticleViewer {
    */
   async init() {
     console.log('🔬 Initializing ATLAS Particle Viewer...');
+    console.log('DEBUG: Starting initialization process');
     
     try {
       this.showLoadingScreen();
+      console.log('DEBUG: Loading screen shown');
       
       // Wait for DOM to be ready
       await this.waitForDOM();
+      console.log('DEBUG: DOM ready');
       
       // Initialize core components
       await this.initializeComponents();
+      console.log('DEBUG: Components initialized');
       
       // Load initial data
       await this.loadInitialData();
+      console.log('DEBUG: Initial data loaded');
       
       this.hideLoadingScreen();
       this.isInitialized = true;
@@ -99,17 +104,23 @@ class AtlasParticleViewer {
     }
 
     // Initialize Three.js scene
+    console.log('DEBUG: About to create ThreeScene');
     this.scene = new ThreeScene(container);
     console.log('✓ Three.js scene initialized');
+    console.log('DEBUG: ThreeScene created successfully');
 
     // Initialize detector geometry
+    console.log('DEBUG: About to create DetectorGeometry');
     this.detector = new DetectorGeometry();
     this.scene.add(this.detector.getGroup());
     console.log('✓ ATLAS detector geometry created');
+    console.log('DEBUG: DetectorGeometry created and added');
 
     // Initialize particle track system
+    console.log('DEBUG: About to create ParticleTracks');
     this.particleTracks = new ParticleTracks(this.scene.getScene());
     console.log('✓ Particle track system initialized');
+    console.log('DEBUG: ParticleTracks created successfully');
 
     // Initialize data loader
     this.dataLoader = new DataLoader();
@@ -209,6 +220,96 @@ class AtlasParticleViewer {
       </div>
     `;
     document.body.appendChild(errorDiv);
+  }
+
+  /**
+   * Create fallback demo data when sample files can't be loaded
+   */
+  createFallbackDemoData() {
+    console.log('Creating fallback demo data...');
+    
+    const fallbackEvent = {
+      event_id: 'demo-fallback',
+      run_number: 999999,
+      event_number: 1,
+      vertex: { x: 0.0, y: 0.0, z: 0.0 },
+      metadata: {
+        collision_energy: '13 TeV',
+        detector: 'ATLAS',
+        event_type: 'demo_event',
+        source: 'fallback_generator'
+      },
+      particles: [
+        {
+          id: 1,
+          pdg: 11,
+          type: 'electron',
+          px: 20.0,
+          py: -10.0,
+          pz: 30.0,
+          E: 40.0,
+          charge: -1,
+          trajectory: [
+            { x: 0.0, y: 0.0, z: 0.0 },
+            { x: 0.2, y: -0.1, z: 0.3 },
+            { x: 0.4, y: -0.2, z: 0.6 },
+            { x: 0.6, y: -0.3, z: 0.9 },
+            { x: 0.8, y: -0.4, z: 1.2 }
+          ]
+        },
+        {
+          id: 2,
+          pdg: 13,
+          type: 'muon',
+          px: -15.0,
+          py: 25.0,
+          pz: -20.0,
+          E: 35.0,
+          charge: -1,
+          trajectory: [
+            { x: 0.0, y: 0.0, z: 0.0 },
+            { x: -0.15, y: 0.25, z: -0.2 },
+            { x: -0.3, y: 0.5, z: -0.4 },
+            { x: -0.45, y: 0.75, z: -0.6 },
+            { x: -0.6, y: 1.0, z: -0.8 }
+          ]
+        },
+        {
+          id: 3,
+          pdg: 22,
+          type: 'photon',
+          px: 12.0,
+          py: 8.0,
+          pz: 20.0,
+          E: 25.0,
+          charge: 0,
+          trajectory: [
+            { x: 0.0, y: 0.0, z: 0.0 },
+            { x: 0.12, y: 0.08, z: 0.2 },
+            { x: 0.24, y: 0.16, z: 0.4 },
+            { x: 0.36, y: 0.24, z: 0.6 }
+          ]
+        }
+      ]
+    };
+    
+    try {
+      // Load the fallback data directly
+      this.dataLoader.events = [fallbackEvent];
+      this.dataLoader.currentEventIndex = 0;
+      this.dataLoader.currentEvent = fallbackEvent;
+      
+      // Trigger UI update
+      if (this.uiManager && this.uiManager.loadEventData) {
+        this.uiManager.loadEventData(fallbackEvent);
+        this.uiManager.showNotification('Demo data loaded successfully', 'success');
+      }
+      
+      console.log('✓ Fallback demo data created and loaded');
+    } catch (error) {
+      console.error('Failed to create fallback data:', error);
+      this.showErrorMessage('Failed to load any particle data');
+    }
   }
 
   /**

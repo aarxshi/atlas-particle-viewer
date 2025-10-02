@@ -26,7 +26,26 @@ A browser-based 3D particle collision event viewer using CERN ATLAS Open Data. T
 
 ## Quick Start
 
-### Option 1: Standalone Demo (No Installation Required)
+### Option 1: Enhanced ATLAS Viewer (Recommended)
+
+The enhanced version with full animation and controls:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-repo/atlas-particle-viewer.git
+cd atlas-particle-viewer
+
+# Install dependencies
+npm install
+
+# Start a local server
+python -m http.server 8080
+
+# Open enhanced viewer
+open http://localhost:8080/atlas-viewer.html
+```
+
+### Option 2: Standalone Demo (No Installation Required)
 
 Simply open `standalone-demo.html` in any modern web browser:
 
