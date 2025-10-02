@@ -1,0 +1,14 @@
+nohup: ignoring input
+
+> atlas-particle-viewer@1.0.0 dev
+> vite
+
+
+  VITE v4.5.14  ready in 618 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: use --host to expose
+7:58:48 AM [vite] hmr update /styles.css?direct
+7:58:57 AM [vite] page reload standalone-demo.html
+7:59:14 AM [vite] page reload src/data-loader.js
+7:59:26 AM [vite] page reload src/main.js
