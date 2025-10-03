@@ -426,18 +426,6 @@ For better performance on lower-end devices:
 3. **Disable Animation**: Use static display mode
 4. **Lower Browser Zoom**: Reduces pixel density requirements
 
-### System Requirements
-
-**Minimum:**
-- Modern browser with WebGL 1.0 support
-- 2GB RAM
-- Integrated graphics
-
-**Recommended:**
-- Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
-- 4GB RAM
-- Dedicated graphics card
-- 1920x1080 display resolution
 
 ## Development
 
