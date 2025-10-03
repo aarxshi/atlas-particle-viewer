@@ -646,15 +646,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Three.js Documentation**: https://threejs.org/docs/
 - **WebGL Specification**: https://www.khronos.org/webgl/
 
-## Support
-
-For questions and support:
-
-- 📧 **Email**: atlas-viewer-support@example.com
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/atlas-particle-viewer/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-repo/atlas-particle-viewer/discussions)
-- 📖 **Documentation**: [Wiki](https://github.com/your-repo/atlas-particle-viewer/wiki)
-
 ---
-
-**Made with ❤️ for the particle physics community**
