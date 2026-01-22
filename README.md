@@ -4,6 +4,10 @@ A browser-based, self-contained 3D particle collision event viewer inspired by C
 
 The focus of this project is clarity and accessibility: enabling users to explore particle tracks, detector layers, and basic kinematic behaviour using a lightweight, portable setup.
 
+<p align="center">
+  <img src="./screenshot.png" alt="ATLAS Particle Viewer" width="800">
+</p>
+
 
 ## Overview
 
