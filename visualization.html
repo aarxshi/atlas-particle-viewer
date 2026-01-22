@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Browser-based 3D particle collision event viewer using CERN ATLAS Open Data">
+    <title>ATLAS Particle Viewer - Full Application</title>
+    
+    <!-- Original ATLAS Particle Viewer CSS -->
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>ATLAS Particle Viewer</h1>
+            <p>Loading detector geometry and event data...</p>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Container -->
+    <div id="three-container"></div>
+
+    <!-- Original UI Overlay -->
+    <div class="ui-overlay">
+        <div class="ui-panel">
+            <div class="panel-header">
+                <h2>ATLAS Particle Viewer</h2>
+                <div class="panel-controls">
+                    <button id="toggle-ui" title="Toggle UI (U)">⚙️</button>
+                    <button id="help-btn" title="Help">❓</button>
+                </div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Event Controls -->
+                <div class="control-section">
+                    <h3>Event</h3>
+                    <div class="event-controls">
+                        <select id="event-selector">
+                            <option value="atlas-001">High-energy e+e- pair</option>
+                            <option value="atlas-002">Z → μ+μ- decay</option>
+                        </select>
+                        <div class="event-nav">
+                            <button id="prev-event" title="Previous Event" onclick="loadPreviousEvent()">⮜</button>
+                            <span id="event-counter">1/2</span>
+                            <button id="next-event" title="Next Event" onclick="loadNextEvent()">⮞</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animation Controls -->
+                <div class="control-section">
+                    <h3>Animation</h3>
+                    <div class="animation-controls">
+                        <button id="play-pause" title="Play/Pause (Space)" onclick="toggleAnimation()">⏸️</button>
+                        <button id="reset-animation" title="Reset Animation" onclick="resetAnimation()">🔄</button>
+                        <button id="step-animation" title="Step Forward" onclick="stepAnimation()">⏭️</button>
+                        <div class="animation-speed">
+                            <label>Speed:</label>
+                            <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1" onchange="updateAnimationSpeed(this.value)" />
+                            <span id="speed-value">1x</span>
+                        </div>
+                        <div class="animation-progress">
+                            <label>Progress:</label>
+                            <input type="range" id="progress-slider" min="0" max="100" value="0" onchange="setAnimationProgress(this.value)" />
+                            <span id="progress-value">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div class="control-section">
+                    <h3>Data Import</h3>
+                    <div class="file-upload">
+                        <input type="file" id="file-input" accept=".json,.csv" onchange="handleFileUpload(this)" />
+                        <label for="file-input" class="upload-button">📁 Upload Event Data</label>
+                        <div id="file-status" class="file-status"></div>
+                    </div>
+                </div>
+
+                <!-- Camera Controls -->
+                <div class="control-section">
+                    <h3>Camera & View</h3>
+                    <div class="view-controls">
+                        <button onclick="resetView()">🔄 Reset View (R)</button>
+                        <button onclick="toggleUI()">👁️ Toggle UI (U)</button>
+                        <button onclick="toggleAxes()">📐 Toggle Axes (A)</button>
+                        <button onclick="toggleFullscreen()">🔍 Fullscreen</button>
+                    </div>
+                    <div class="preset-views">
+                        <h4>Preset Views</h4>
+                        <button onclick="setTopView()">⬆️ Top View</button>
+                        <button onclick="setSideView()">↔️ Side View</button>
+                        <button onclick="setFrontView()">⬇️ Front View</button>
+                    </div>
+                </div>
+
+                <!-- Particle Filters -->
+                <div class="control-section">
+                    <h3>Particle Filters</h3>
+                    <div class="filter-controls">
+                        <div class="particle-types">
+                            <h4>Types</h4>
+                            <div id="particle-type-filters" class="checkbox-grid">
+                                <label><input type="checkbox" value="electron" checked> Electrons</label>
+                                <label><input type="checkbox" value="muon" checked> Muons</label>
+                                <label><input type="checkbox" value="photon" checked> Photons</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detector Controls -->
+                <div class="control-section">
+                    <h3>Detector Layers</h3>
+                    <div id="detector-layer-controls" class="checkbox-grid">
+                        <label><input type="checkbox" id="inner-detector" checked onchange="toggleDetectorLayer('inner')"> Inner Detector</label>
+                        <label><input type="checkbox" id="em-calorimeter" checked onchange="toggleDetectorLayer('em')"> EM Calorimeter</label>
+                        <label><input type="checkbox" id="had-calorimeter" checked onchange="toggleDetectorLayer('had')"> Had Calorimeter</label>
+                        <label><input type="checkbox" id="muon-system" checked onchange="toggleDetectorLayer('muon')"> Muon System</label>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="control-section">
+                    <h3>Event Statistics</h3>
+                    <div id="event-stats" class="stats-display">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Particles:</span>
+                            <span class="stat-value" id="total-particles">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Visible Tracks:</span>
+                            <span class="stat-value" id="visible-tracks">0</span>
+                        </div>
+                        <div id="current-event-info">
+                            <strong>Event:</strong> <span id="event-name">None</span><br>
+                            <strong>Description:</strong> <span id="event-description">No event loaded</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="particle-legend">
+        <h4 style="margin-bottom: 12px; text-align: center; color: #00ffff;">Particle Types</h4>
+        <div class="legend-item"><div class="legend-color" style="background: #00FF00;"></div><span>e⁻ Electron</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #FF0000;"></div><span>μ⁻ Muon</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #FFFF00;"></div><span>γ Photon</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #0080FF;"></div><span>π⁺ Pion</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #FF8000;"></div><span>K⁺ Kaon</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #8000FF;"></div><span>p Proton</span></div>
+    </div>
+
+    <!-- Performance Monitor -->
+    <div class="performance-monitor">
+        <div><span class="status-indicator status-success"></span>FPS: <span id="fps-display">60</span></div>
+        <div><span class="status-indicator status-pending"></span>Particles: <span id="particle-count">0</span></div>
+        <div><span class="status-indicator status-pending"></span>Memory: <span id="memory-display">0MB</span></div>
+    </div>
+
+    <!-- Debug Information -->
+    <div id="debug-info">
+        <h4>System Status</h4>
+        <div id="debug-steps"></div>
+    </div>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+
+    
+    <!-- Embedded OrbitControls (converted from ES6 module to regular script) -->
+    <script>
+        // Simple OrbitControls implementation for this demo
+        THREE.OrbitControls = function(camera, domElement) {
+            this.camera = camera;
+            this.domElement = domElement;
+            this.target = new THREE.Vector3();
+            
+            // Settings
+            this.enableDamping = true;
+            this.dampingFactor = 0.05;
+            this.minDistance = 1;
+            this.maxDistance = 100;
+            this.enableZoom = true;
+            this.enableRotate = true;
+            this.enablePan = true;
+            
+            // State
+            const scope = this;
+            const spherical = new THREE.Spherical();
+            const sphericalDelta = new THREE.Spherical();
+            let scale = 1;
+            const panOffset = new THREE.Vector3();
+            let zoomChanged = false;
+            
+            const rotateStart = new THREE.Vector2();
+            const rotateEnd = new THREE.Vector2();
+            const rotateDelta = new THREE.Vector2();
+            
+            const STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2, TOUCH_ROTATE: 3, TOUCH_PAN: 4, TOUCH_DOLLY_PAN: 5, TOUCH_DOLLY_ROTATE: 6 };
+            let state = STATE.NONE;
+            
+            this.update = function() {
+                const offset = new THREE.Vector3();
+                const quat = new THREE.Quaternion().setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+                const quatInverse = quat.clone().invert();
+                const lastPosition = new THREE.Vector3();
+                const lastQuaternion = new THREE.Quaternion();
+                
+                return function update() {
+                    const position = scope.camera.position;
+                    offset.copy(position).sub(scope.target);
+                    offset.applyQuaternion(quat);
+                    spherical.setFromVector3(offset);
+                    
+                    if (scope.enableDamping) {
+                        spherical.theta += sphericalDelta.theta * scope.dampingFactor;
+                        spherical.phi += sphericalDelta.phi * scope.dampingFactor;
+                    } else {
+                        spherical.theta += sphericalDelta.theta;
+                        spherical.phi += sphericalDelta.phi;
+                    }
+                    
+                    spherical.phi = Math.max(0.000001, Math.min(Math.PI - 0.000001, spherical.phi));
+                    spherical.radius *= scale;
+                    spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+                    
+                    scope.target.add(panOffset);
+                    offset.setFromSpherical(spherical);
+                    offset.applyQuaternion(quatInverse);
+                    position.copy(scope.target).add(offset);
+                    scope.camera.lookAt(scope.target);
+                    
+                    if (scope.enableDamping) {
+                        sphericalDelta.theta *= (1 - scope.dampingFactor);
+                        sphericalDelta.phi *= (1 - scope.dampingFactor);
+                    } else {
+                        sphericalDelta.set(0, 0, 0);
+                    }
+                    
+                    scale = 1;
+                    panOffset.set(0, 0, 0);
+                    
+                    if (zoomChanged || 
+                        lastPosition.distanceToSquared(scope.camera.position) > 0.000001 ||
+                        8 * (1 - lastQuaternion.dot(scope.camera.quaternion)) > 0.000001) {
+                        
+                        lastPosition.copy(scope.camera.position);
+                        lastQuaternion.copy(scope.camera.quaternion);
+                        zoomChanged = false;
+                        return true;
+                    }
+                    return false;
+                };
+            }();
+            
+            this.reset = function() {
+                scope.target.set(0, 0, 0);
+                scope.camera.position.set(5, 8, 12);
+                scope.camera.lookAt(scope.target);
+            };
+            
+            // Mouse event handlers
+            function onMouseDown(event) {
+                if (!scope.enableRotate && !scope.enablePan) return;
+                event.preventDefault();
+                
+                if (event.button === 0) {
+                    state = STATE.ROTATE;
+                    rotateStart.set(event.clientX, event.clientY);
+                } else if (event.button === 2) {
+                    state = STATE.PAN;
+                }
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+            
+            function onMouseMove(event) {
+                if (!scope.enableRotate && !scope.enablePan) return;
+                event.preventDefault();
+                
+                if (state === STATE.ROTATE) {
+                    rotateEnd.set(event.clientX, event.clientY);
+                    rotateDelta.subVectors(rotateEnd, rotateStart).multiplyScalar(0.01);
+                    
+                    const element = scope.domElement;
+                    sphericalDelta.theta -= 2 * Math.PI * rotateDelta.x / element.clientHeight;
+                    sphericalDelta.phi -= 2 * Math.PI * rotateDelta.y / element.clientHeight;
+                    
+                    rotateStart.copy(rotateEnd);
+                }
+            }
+            
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                state = STATE.NONE;
+            }
+            
+            function onMouseWheel(event) {
+                if (!scope.enableZoom) return;
+                event.preventDefault();
+                
+                if (event.deltaY < 0) {
+                    scale /= 1.1;
+                } else if (event.deltaY > 0) {
+                    scale *= 1.1;
+                }
+                
+                zoomChanged = true;
+            }
+            
+            // Add event listeners
+            this.domElement.addEventListener('mousedown', onMouseDown);
+            this.domElement.addEventListener('wheel', onMouseWheel);
+            this.domElement.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+        };
+    </script>
+
+    <!-- Main Application Script -->
+    <script>
+        // Debug system
+        const debugSteps = document.getElementById('debug-steps');
+        function addDebugStep(message, status = 'pending') {
+            const step = document.createElement('div');
+            step.className = `step ${status}`;
+            step.textContent = message;
+            debugSteps.appendChild(step);
+            console.log(`[${status.toUpperCase()}] ${message}`);
+            
+            // Keep only last 10 debug messages
+            while (debugSteps.children.length > 10) {
+                debugSteps.removeChild(debugSteps.firstChild);
+            }
+            
+            return step;
+        }
+
+        // Global application state
+        let scene, camera, renderer, controls;
+        let detector = {}, particleTracks = [], particleMarkers = [];
+        let currentEvent = null, currentEventIndex = 0;
+        let isAnimating = true;
+        let animationSpeed = 1;
+        let animationProgress = 0;
+        let maxAnimationTime = 5; // seconds
+        let frameCount = 0;
+        let lastTime = performance.now();
+        
+        // Initialize the application
+        function initApplication() {
+            addDebugStep('Initializing ATLAS Particle Viewer...', 'pending');
+            
+            try {
+                // Check Three.js
+                if (typeof THREE === 'undefined') {
+                    throw new Error('Three.js not loaded');
+                }
+                addDebugStep('Three.js loaded successfully', 'success');
+                
+                // Initialize scene
+                initScene();
+                addDebugStep('3D scene initialized', 'success');
+                
+                // Create detector geometry
+                createDetectorGeometry();
+                addDebugStep('ATLAS detector created', 'success');
+                
+                // Load sample event
+                loadSampleEvent();
+                
+                // Hide loading screen
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.style.animation = 'fadeOut 1s ease-out forwards';
+                        setTimeout(() => {
+                            if (loadingScreen.parentNode) {
+                                loadingScreen.parentNode.removeChild(loadingScreen);
+                            }
+                        }, 1000);
+                    }
+                }, 2000);
+                
+                addDebugStep('Application ready!', 'success');
+                
+            } catch (error) {
+                addDebugStep(`Initialization failed: ${error.message}`, 'error');
+                console.error('Application initialization error:', error);
+            }
+        }
+        
+        // Initialize Three.js scene
+        function initScene() {
+            // Container
+            const container = document.getElementById('three-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0a);
+            
+            // Camera (positioned for horizontal detector view)
+            const aspect = window.innerWidth / window.innerHeight;
+            camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+            camera.position.set(5, 8, 12);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: false,
+                powerPreference: 'high-performance'
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 3;
+            controls.maxDistance = 50;
+            
+            // Lighting
+            setupLighting();
+            
+            // Add coordinate axes
+            const axesHelper = new THREE.AxesHelper(3);
+            axesHelper.name = 'axes';
+            scene.add(axesHelper);
+            
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', onKeyDown);
+            
+            // Start animation loop
+            animate();
+        }
+        
+        // Setup scene lighting
+        function setupLighting() {
+            // Ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            // Main directional light
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight1.position.set(10, 10, 5);
+            directionalLight1.castShadow = true;
+            directionalLight1.shadow.mapSize.width = 2048;
+            directionalLight1.shadow.mapSize.height = 2048;
+            scene.add(directionalLight1);
+            
+            // Fill light
+            const directionalLight2 = new THREE.DirectionalLight(0x8888ff, 0.3);
+            directionalLight2.position.set(-5, 5, -5);
+            scene.add(directionalLight2);
+            
+            // Point light at collision vertex
+            const pointLight = new THREE.PointLight(0xffffff, 0.5, 15);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+        }
+        
+        // Create ATLAS detector geometry (horizontal orientation)
+        function createDetectorGeometry() {
+            const detectorGroup = new THREE.Group();
+            detectorGroup.name = 'detector';
+            
+            // Rotate entire detector to horizontal (along Z-axis)
+            detectorGroup.rotation.z = Math.PI / 2;
+            
+            // Inner Detector (Pixel + SCT + TRT) - Blue (thinner)
+            const innerGeometry = new THREE.CylinderGeometry(1.2, 1.2, 8, 32, 1, true);
+            const innerMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x4169E1, 
+                transparent: true, 
+                opacity: 0.15,
+                side: THREE.DoubleSide 
+            });
+            detector.inner = new THREE.Mesh(innerGeometry, innerMaterial);
+            detector.inner.name = 'inner-detector';
+            detectorGroup.add(detector.inner);
+            
+            // EM Calorimeter - Green (thinner)
+            const emGeometry = new THREE.CylinderGeometry(2.3, 2.3, 8, 32, 1, true);
+            const emMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x32CD32, 
+                transparent: true, 
+                opacity: 0.12,
+                side: THREE.DoubleSide 
+            });
+            detector.em = new THREE.Mesh(emGeometry, emMaterial);
+            detector.em.name = 'em-calorimeter';
+            detectorGroup.add(detector.em);
+            
+            // Hadronic Calorimeter - Red (thinner)
+            const hadGeometry = new THREE.CylinderGeometry(3.6, 3.6, 8, 32, 1, true);
+            const hadMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0xFF6347, 
+                transparent: true, 
+                opacity: 0.1,
+                side: THREE.DoubleSide 
+            });
+            detector.had = new THREE.Mesh(hadGeometry, hadMaterial);
+            detector.had.name = 'had-calorimeter';
+            detectorGroup.add(detector.had);
+            
+            // Muon System - Purple (thinner)
+            const muonGeometry = new THREE.CylinderGeometry(5.8, 5.8, 10, 32, 1, true);
+            const muonMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x9370DB, 
+                transparent: true, 
+                opacity: 0.08,
+                side: THREE.DoubleSide 
+            });
+            detector.muon = new THREE.Mesh(muonGeometry, muonMaterial);
+            detector.muon.name = 'muon-system';
+            detectorGroup.add(detector.muon);
+            
+            // Add detector endcaps (simplified) - now on left/right sides
+            const endcapGeometry = new THREE.RingGeometry(1.2, 5.8, 16);
+            const endcapMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x666666, 
+                transparent: true, 
+                opacity: 0.06,
+                side: THREE.DoubleSide 
+            });
+            
+            const endcap1 = new THREE.Mesh(endcapGeometry, endcapMaterial);
+            endcap1.position.y = 5;
+            endcap1.rotation.x = Math.PI / 2;
+            detectorGroup.add(endcap1);
+            
+            const endcap2 = new THREE.Mesh(endcapGeometry, endcapMaterial);
+            endcap2.position.y = -5;
+            endcap2.rotation.x = Math.PI / 2;
+            detectorGroup.add(endcap2);
+            
+            scene.add(detectorGroup);
+        }
+        
+        // Sample event data with realistic particle physics
+        const sampleEvents = [
+            {
+                event_id: "atlas-001",
+                description: "High-energy electron-positron pair production",
+                particles: [
+                    {
+                        id: 1, type: "electron", charge: -1,
+                        momentum: { px: 45.2, py: -12.8, pz: 67.3, E: 82.1 },
+                        trajectory: [
+                            { x: 0, y: 0, z: 0 }, { x: 0.31, y: 0.21, z: -0.06 },
+                            { x: 0.72, y: 0.48, z: -0.14 }, { x: 1.21, y: 0.81, z: -0.24 },
+                            { x: 1.79, y: 1.22, z: -0.35 }, { x: 2.51, y: 1.71, z: -0.49 },
+                            { x: 3.2, y: 2.1, z: -0.58 }
+                        ]
+                    },
+                    {
+                        id: 2, type: "positron", charge: 1,
+                        momentum: { px: -38.7, py: 15.2, pz: -61.8, E: 75.3 },
+                        trajectory: [
+                            { x: 0, y: 0, z: 0 }, { x: -0.29, y: -0.18, z: 0.07 },
+                            { x: -0.67, y: -0.41, z: 0.16 }, { x: -1.15, y: -0.69, z: 0.27 },
+                            { x: -1.73, y: -1.03, z: 0.40 }, { x: -2.42, y: -1.44, z: 0.56 },
+                            { x: -3.1, y: -1.8, z: 0.68 }
+                        ]
+                    },
+                    {
+                        id: 3, type: "photon", charge: 0,
+                        momentum: { px: 23.1, py: 8.7, pz: 31.2, E: 41.8 },
+                        trajectory: [
+                            { x: 0, y: 0, z: 0 }, { x: 0.42, y: 0.31, z: 0.12 },
+                            { x: 0.84, y: 0.62, z: 0.23 }, { x: 1.26, y: 0.93, z: 0.35 },
+                            { x: 1.8, y: 1.3, z: 0.5 }
+                        ]
+                    }
+                ]
+            },
+            {
+                event_id: "atlas-002", 
+                description: "Muon pair from Z boson decay",
+                particles: [
+                    {
+                        id: 1, type: "muon", charge: -1,
+                        momentum: { px: 52.3, py: -18.9, pz: 71.2, E: 91.4 },
+                        trajectory: [
+                            { x: 0, y: 0, z: 0 }, { x: 0.20, y: 0.15, z: -0.05 },
+                            { x: 0.43, y: 0.32, z: -0.11 }, { x: 0.69, y: 0.51, z: -0.18 },
+                            { x: 0.98, y: 0.73, z: -0.26 }, { x: 1.31, y: 0.97, z: -0.35 },
+                            { x: 1.67, y: 1.24, z: -0.45 }, { x: 2.08, y: 1.54, z: -0.56 },
+                            { x: 2.8, y: 2.1, z: -0.75 }, { x: 3.8, y: 2.8, z: -1.0 },
+                            { x: 4.9, y: 3.6, z: -1.3 }, { x: 6.2, y: 4.5, z: -1.7 }
+                        ]
+                    },
+                    {
+                        id: 2, type: "antimuon", charge: 1,
+                        momentum: { px: -49.8, py: 21.1, pz: -68.7, E: 88.2 },
+                        trajectory: [
+                            { x: 0, y: 0, z: 0 }, { x: -0.19, y: -0.14, z: 0.06 },
+                            { x: -0.41, y: -0.30, z: 0.12 }, { x: -0.66, y: -0.48, z: 0.19 },
+                            { x: -0.94, y: -0.68, z: 0.27 }, { x: -1.25, y: -0.90, z: 0.36 },
+                            { x: -1.59, y: -1.15, z: 0.46 }, { x: -1.97, y: -1.42, z: 0.57 },
+                            { x: -2.7, y: -1.9, z: 0.8 }, { x: -3.7, y: -2.6, z: 1.1 },
+                            { x: -4.8, y: -3.4, z: 1.5 }, { x: -6.1, y: -4.3, z: 1.9 }
+                        ]
+                    }
+                ]
+            }
+        ];
+        
+        // Load sample event
+        function loadSampleEvent() {
+            const event = sampleEvents[currentEventIndex];
+            currentEvent = event;
+            
+            // Clear existing tracks
+            clearTracks();
+            
+            // Create particle tracks
+            event.particles.forEach(particle => {
+                createParticleTrack(particle);
+            });
+            
+            // Update UI
+            document.getElementById('total-particles').textContent = event.particles.length;
+            document.getElementById('visible-tracks').textContent = event.particles.length;
+            document.getElementById('event-name').textContent = event.event_id;
+            document.getElementById('event-description').textContent = event.description;
+            document.getElementById('particle-count').textContent = event.particles.length;
+            
+            // Update event selector
+            const selector = document.getElementById('event-selector');
+            if (selector) {
+                selector.value = event.event_id;
+            }
+            
+            // Update counter
+            document.getElementById('event-counter').textContent = `${currentEventIndex + 1}/${sampleEvents.length}`;
+            
+            addDebugStep(`Loaded event ${event.event_id} with ${event.particles.length} particles`, 'success');
+        }
+        
+        // Load random event
+        function loadRandomEvent() {
+            const randomIndex = Math.floor(Math.random() * sampleEvents.length);
+            const event = sampleEvents[randomIndex];
+            currentEvent = event;
+            
+            clearTracks();
+            
+            event.particles.forEach(particle => {
+                createParticleTrack(particle);
+            });
+            
+            document.getElementById('event-info').innerHTML = `
+                <strong>Event:</strong> ${event.event_id}<br>
+                <strong>Description:</strong> ${event.description}<br>
+                <strong>Particles:</strong> ${event.particles.length}
+            `;
+            
+            document.getElementById('particle-count').textContent = event.particles.length;
+            addDebugStep(`Loaded random event ${event.event_id}`, 'success');
+        }
+        
+        // Create particle track visualization with progressive animation
+        function createParticleTrack(particle) {
+            const points = particle.trajectory.map(point => 
+                new THREE.Vector3(point.x, point.y, point.z)
+            );
+            
+            // Choose color based on particle type
+            let color;
+            switch (particle.type) {
+                case 'electron':
+                case 'positron':
+                    color = 0x00FF00; // Green
+                    break;
+                case 'muon':
+                case 'antimuon':
+                    color = 0xFF0000; // Red
+                    break;
+                case 'photon':
+                    color = 0xFFFF00; // Yellow
+                    break;
+                case 'pion':
+                    color = 0x0080FF; // Blue
+                    break;
+                case 'kaon':
+                    color = 0xFF8000; // Orange
+                    break;
+                case 'proton':
+                    color = 0x8000FF; // Purple
+                    break;
+                default:
+                    color = 0xFFFFFF; // White
+            }
+            
+            // Create full track geometry (initially invisible)
+            const fullTrackGeometry = new THREE.BufferGeometry().setFromPoints(points);
+            const trackMaterial = new THREE.LineBasicMaterial({ 
+                color: color, 
+                linewidth: 3,
+                transparent: true,
+                opacity: 0.3
+            });
+            
+            const fullTrack = new THREE.Line(fullTrackGeometry, trackMaterial);
+            fullTrack.userData = {
+                particleId: particle.id,
+                particleType: particle.type,
+                momentum: particle.momentum,
+                charge: particle.charge,
+                isFullTrack: true,
+                points: points
+            };
+            fullTrack.name = `full-track-${particle.id}`;
+            fullTrack.visible = false; // Initially hidden
+            scene.add(fullTrack);
+            particleTracks.push(fullTrack);
+            
+            // Create animated track (grows progressively)
+            const animatedTrackMaterial = new THREE.LineBasicMaterial({ 
+                color: color, 
+                linewidth: 4,
+                transparent: true,
+                opacity: 1.0
+            });
+            
+            const animatedTrack = new THREE.Line(new THREE.BufferGeometry(), animatedTrackMaterial);
+            animatedTrack.userData = {
+                particleId: particle.id,
+                particleType: particle.type,
+                momentum: particle.momentum,
+                charge: particle.charge,
+                isAnimatedTrack: true,
+                points: points,
+                fullPoints: points
+            };
+            animatedTrack.name = `animated-track-${particle.id}`;
+            scene.add(animatedTrack);
+            particleTracks.push(animatedTrack);
+            
+            // Create moving particle marker
+            const markerGeometry = new THREE.SphereGeometry(0.05, 12, 12);
+            const markerMaterial = new THREE.MeshBasicMaterial({ 
+                color: color,
+                transparent: true,
+                opacity: 1.0
+            });
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            marker.position.copy(points[0]); // Start at origin
+            marker.userData = {
+                particleId: particle.id,
+                particleType: particle.type,
+                isParticleMarker: true,
+                points: points
+            };
+            marker.name = `particle-${particle.id}`;
+            scene.add(marker);
+            particleMarkers.push(marker);
+        }
+        
+        // Clear all particle tracks
+        function clearTracks() {
+            particleTracks.forEach(track => {
+                scene.remove(track);
+                if (track.geometry) track.geometry.dispose();
+                if (track.material) track.material.dispose();
+            });
+            particleMarkers.forEach(marker => {
+                scene.remove(marker);
+                if (marker.geometry) marker.geometry.dispose();
+                if (marker.material) marker.material.dispose();
+            });
+            particleTracks = [];
+            particleMarkers = [];
+            animationProgress = 0;
+            
+            document.getElementById('particle-count').textContent = '0';
+            document.getElementById('progress-slider').value = 0;
+            document.getElementById('progress-value').textContent = '0%';
+        }
+        
+        
+        // Event handlers
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyR':
+                    resetView();
+                    break;
+                case 'KeyU':
+                    toggleUI();
+                    break;
+                case 'Space':
+                    event.preventDefault();
+                    toggleAnimation();
+                    break;
+                case 'KeyA':
+                    toggleAxes();
+                    break;
+            }
+        }
+        
+        // UI Functions
+        function resetView() {
+            camera.position.set(5, 8, 12);
+            camera.lookAt(0, 0, 0);
+            if (controls) controls.reset();
+            addDebugStep('Camera view reset', 'success');
+        }
+        
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            const button = document.getElementById('play-pause');
+            if (button) {
+                button.textContent = isAnimating ? '⏸️' : '▶️';
+            }
+            addDebugStep(`Animation ${isAnimating ? 'playing' : 'paused'}`, 'success');
+        }
+        
+        function toggleUI() {
+            const overlay = document.querySelector('.ui-overlay');
+            const legend = document.querySelector('.particle-legend');
+            const monitor = document.querySelector('.performance-monitor');
+            
+            if (overlay) {
+                const isVisible = overlay.style.display !== 'none';
+                overlay.style.display = isVisible ? 'none' : 'block';
+                legend.style.display = isVisible ? 'none' : 'block';
+                monitor.style.display = isVisible ? 'none' : 'flex';
+            }
+        }
+        
+        function toggleAxes() {
+            const axes = scene.getObjectByName('axes');
+            if (axes) {
+                axes.visible = !axes.visible;
+            }
+        }
+        
+        function showFullDetector() {
+            Object.values(detector).forEach(component => {
+                if (component) component.visible = true;
+            });
+            addDebugStep('Full detector view enabled', 'success');
+        }
+        
+        function showTrackerOnly() {
+            Object.values(detector).forEach((component, index) => {
+                if (component) {
+                    component.visible = index === 0; // Only show inner detector
+                }
+            });
+            addDebugStep('Tracker-only view enabled', 'success');
+        }
+        
+        function toggleDetectorVisibility() {
+            Object.values(detector).forEach(component => {
+                if (component && component.material) {
+                    component.material.opacity = component.material.opacity > 0.1 ? 0.05 : 0.3;
+                }
+            });
+            addDebugStep('Detector transparency toggled', 'success');
+        }
+        
+        // Additional UI Functions
+        function loadPreviousEvent() {
+            currentEventIndex = (currentEventIndex - 1 + sampleEvents.length) % sampleEvents.length;
+            loadSampleEvent();
+        }
+        
+        function loadNextEvent() {
+            currentEventIndex = (currentEventIndex + 1) % sampleEvents.length;
+            loadSampleEvent();
+        }
+        
+        function updateAnimationSpeed(speed) {
+            animationSpeed = parseFloat(speed);
+            document.getElementById('speed-value').textContent = speed + 'x';
+            addDebugStep(`Animation speed set to ${speed}x`, 'success');
+        }
+        
+        function resetAnimation() {
+            animationProgress = 0;
+            isAnimating = false;
+            
+            // Hide full tracks
+            particleTracks.forEach(track => {
+                if (track.userData && track.userData.isFullTrack) {
+                    track.visible = false;
+                }
+            });
+            
+            // Reset particle markers to start
+            particleMarkers.forEach(marker => {
+                if (marker.userData && marker.userData.points) {
+                    marker.position.copy(marker.userData.points[0]);
+                    marker.material.opacity = 1.0;
+                }
+            });
+            
+            updateParticleAnimation(0);
+            document.getElementById('progress-slider').value = 0;
+            document.getElementById('progress-value').textContent = '0%';
+            document.getElementById('play-pause').textContent = '▶️';
+            addDebugStep('Animation reset', 'success');
+        }
+        
+        function stepAnimation() {
+            if (animationProgress < 1) {
+                animationProgress += 0.05; // 5% step
+                updateParticleAnimation(animationProgress);
+                document.getElementById('progress-slider').value = animationProgress * 100;
+                document.getElementById('progress-value').textContent = Math.round(animationProgress * 100) + '%';
+            }
+        }
+        
+        function setAnimationProgress(value) {
+            animationProgress = parseFloat(value) / 100;
+            updateParticleAnimation(animationProgress);
+            document.getElementById('progress-value').textContent = value + '%';
+            
+            // Show/hide full tracks based on progress
+            particleTracks.forEach(track => {
+                if (track.userData && track.userData.isFullTrack) {
+                    track.visible = animationProgress >= 1;
+                }
+            });
+        }
+        
+        function toggleDetectorLayer(layerName) {
+            const component = detector[layerName];
+            if (component) {
+                component.visible = !component.visible;
+                addDebugStep(`${layerName} detector layer ${component.visible ? 'shown' : 'hidden'}`, 'success');
+            }
+        }
+        
+        // File upload handler
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const statusDiv = document.getElementById('file-status');
+            statusDiv.textContent = 'Loading file...';
+            statusDiv.className = 'file-status loading';
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.particles && Array.isArray(data.particles)) {
+                        // Add to sample events
+                        sampleEvents.push({
+                            event_id: data.event_id || `uploaded-${Date.now()}`,
+                            description: data.description || 'Uploaded event data',
+                            particles: data.particles
+                        });
+                        
+                        // Load the uploaded event
+                        currentEventIndex = sampleEvents.length - 1;
+                        loadSampleEvent();
+                        
+                        statusDiv.textContent = `✅ Loaded ${data.particles.length} particles`;
+                        statusDiv.className = 'file-status success';
+                        addDebugStep(`File uploaded: ${data.particles.length} particles`, 'success');
+                    } else {
+                        throw new Error('Invalid file format - missing particles array');
+                    }
+                } catch (error) {
+                    statusDiv.textContent = `❌ Error: ${error.message}`;
+                    statusDiv.className = 'file-status error';
+                    addDebugStep(`File upload error: ${error.message}`, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // Camera preset views
+        function setTopView() {
+            camera.position.set(0, 15, 0);
+            camera.lookAt(0, 0, 0);
+            addDebugStep('Top view set', 'success');
+        }
+        
+        function setSideView() {
+            camera.position.set(15, 0, 0);
+            camera.lookAt(0, 0, 0);
+            addDebugStep('Side view set', 'success');
+        }
+        
+        function setFrontView() {
+            camera.position.set(0, 0, 15);
+            camera.lookAt(0, 0, 0);
+            addDebugStep('Front view set', 'success');
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                addDebugStep('Entered fullscreen', 'success');
+            } else {
+                document.exitFullscreen();
+                addDebugStep('Exited fullscreen', 'success');
+            }
+        }
+        
+        // Enhanced animation with progressive particle movement
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update controls
+            if (controls) {
+                controls.update();
+            }
+            
+            // Animate particles moving along tracks
+            if (isAnimating) {
+                const deltaTime = 0.016 * animationSpeed; // ~60fps
+                animationProgress += deltaTime / maxAnimationTime;
+                
+                if (animationProgress > 1) {
+                    animationProgress = 1;
+                    // Show full tracks when animation completes
+                    particleTracks.forEach(track => {
+                        if (track.userData && track.userData.isFullTrack) {
+                            track.visible = true;
+                        }
+                    });
+                }
+                
+                updateParticleAnimation(animationProgress);
+                
+                // Update progress slider
+                document.getElementById('progress-slider').value = animationProgress * 100;
+                document.getElementById('progress-value').textContent = Math.round(animationProgress * 100) + '%';
+            }
+            
+            // Performance monitoring
+            frameCount++;
+            const currentTime = performance.now();
+            if (currentTime >= lastTime + 1000) {
+                const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                document.getElementById('fps-display').textContent = fps;
+                
+                // Memory usage (approximate)
+                if (performance.memory) {
+                    const memory = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+                    document.getElementById('memory-display').textContent = memory + 'MB';
+                }
+                
+                frameCount = 0;
+                lastTime = currentTime;
+            }
+            
+            // Render scene
+            renderer.render(scene, camera);
+        }
+        
+        // Update particle animation based on progress (synchronized)
+        function updateParticleAnimation(progress) {
+            // Update animated tracks and particle markers in sync
+            particleTracks.forEach((track, trackIndex) => {
+                if (track.userData && track.userData.isAnimatedTrack) {
+                    const points = track.userData.fullPoints;
+                    const particleId = track.userData.particleId;
+                    
+                    // Find corresponding particle marker
+                    const marker = particleMarkers.find(m => 
+                        m.userData && m.userData.particleId === particleId
+                    );
+                    
+                    if (marker && points.length > 1) {
+                        // Calculate current position along the path
+                        const totalPoints = points.length - 1;
+                        const currentPosition = totalPoints * progress;
+                        const currentIndex = Math.floor(currentPosition);
+                        const nextIndex = Math.min(currentIndex + 1, totalPoints);
+                        const localProgress = currentPosition - currentIndex;
+                        
+                        // Update particle marker position
+                        if (currentIndex < points.length && nextIndex < points.length) {
+                            const currentPoint = points[currentIndex];
+                            const nextPoint = points[nextIndex];
+                            
+                            marker.position.lerpVectors(
+                                new THREE.Vector3(currentPoint.x, currentPoint.y, currentPoint.z),
+                                new THREE.Vector3(nextPoint.x, nextPoint.y, nextPoint.z),
+                                localProgress
+                            );
+                        }
+                        
+                        // Update track to show path up to current particle position
+                        const trackEndIndex = Math.ceil(currentPosition) + 1;
+                        const visiblePoints = points.slice(0, Math.max(1, trackEndIndex));
+                        
+                        // If we're between points, add the interpolated current position
+                        if (localProgress > 0 && currentIndex < totalPoints) {
+                            const currentPoint = points[currentIndex];
+                            const nextPoint = points[nextIndex];
+                            const interpolatedPoint = new THREE.Vector3().lerpVectors(
+                                new THREE.Vector3(currentPoint.x, currentPoint.y, currentPoint.z),
+                                new THREE.Vector3(nextPoint.x, nextPoint.y, nextPoint.z),
+                                localProgress
+                            );
+                            visiblePoints[visiblePoints.length - 1] = interpolatedPoint;
+                        }
+                        
+                        track.geometry.dispose();
+                        track.geometry = new THREE.BufferGeometry().setFromPoints(visiblePoints);
+                        
+                        // Control marker visibility and opacity
+                        if (progress <= 0.01) {
+                            marker.visible = false;
+                        } else {
+                            marker.visible = true;
+                            // Fade out marker as it reaches the end
+                            if (progress > 0.95) {
+                                marker.material.opacity = Math.max(0.2, (1 - progress) * 20);
+                            } else {
+                                marker.material.opacity = 1.0;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Setup event listeners for UI
+        function setupUIEventListeners() {
+            // Event selector
+            const eventSelector = document.getElementById('event-selector');
+            if (eventSelector) {
+                eventSelector.addEventListener('change', function() {
+                    const eventId = this.value;
+                    const eventIndex = sampleEvents.findIndex(e => e.event_id === eventId);
+                    if (eventIndex !== -1) {
+                        currentEventIndex = eventIndex;
+                        loadSampleEvent();
+                    }
+                });
+            }
+            
+            // Toggle UI button
+            const toggleUIBtn = document.getElementById('toggle-ui');
+            if (toggleUIBtn) {
+                toggleUIBtn.addEventListener('click', toggleUI);
+            }
+            
+            // Help button
+            const helpBtn = document.getElementById('help-btn');
+            if (helpBtn) {
+                helpBtn.addEventListener('click', showHelpDialog);
+            }
+            
+            // Particle type filters
+            const particleFilters = document.querySelectorAll('#particle-type-filters input');
+            particleFilters.forEach(filter => {
+                filter.addEventListener('change', updateParticleFilters);
+            });
+        }
+        
+        // Show help dialog
+        function showHelpDialog() {
+            const helpContent = `
+                <div style="
+                    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    background: rgba(20, 20, 40, 0.98); backdrop-filter: blur(15px);
+                    border: 2px solid rgba(0, 255, 255, 0.3); border-radius: 15px;
+                    padding: 30px; max-width: 600px; max-height: 80vh; overflow-y: auto;
+                    z-index: 10000; color: #fff; font-family: Arial, sans-serif;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="color: #00ffff; margin: 0;">🔬 ATLAS Particle Viewer Help</h2>
+                        <button onclick="this.parentElement.parentElement.remove()" 
+                                style="background: #ff4444; border: none; border-radius: 50%; 
+                                       width: 30px; height: 30px; color: white; cursor: pointer; 
+                                       font-size: 16px; font-weight: bold;">✕</button>
+                    </div>
+                    
+                    <div style="line-height: 1.6; font-size: 14px;">
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">🖱️ Mouse Controls</h3>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><strong>Left Click + Drag:</strong> Orbit camera around detector</li>
+                            <li><strong>Right Click + Drag:</strong> Pan view</li>
+                            <li><strong>Mouse Wheel:</strong> Zoom in/out</li>
+                            <li><strong>Click Particle Track:</strong> View details (coming soon)</li>
+                        </ul>
+                        
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">⌨️ Keyboard Shortcuts</h3>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><strong>R:</strong> Reset camera to default view</li>
+                            <li><strong>U:</strong> Toggle UI visibility</li>
+                            <li><strong>Space:</strong> Play/pause animation</li>
+                            <li><strong>A:</strong> Toggle coordinate axes</li>
+                        </ul>
+                        
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">🎬 Animation Controls</h3>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><strong>Play/Pause:</strong> Start/stop particle animation</li>
+                            <li><strong>Step:</strong> Advance animation by 5%</li>
+                            <li><strong>Speed Slider:</strong> Control animation speed (0.1x - 3x)</li>
+                            <li><strong>Progress Slider:</strong> Jump to any point in animation</li>
+                        </ul>
+                        
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">🎨 Particle Colors</h3>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><span style="color: #00ff00;">🟢 Green:</span> Electrons & Positrons</li>
+                            <li><span style="color: #ff0000;">🔴 Red:</span> Muons & Antimuons</li>
+                            <li><span style="color: #ffff00;">🟡 Yellow:</span> Photons</li>
+                            <li><span style="color: #0080ff;">🔵 Blue:</span> Pions</li>
+                            <li><span style="color: #ff8000;">🟠 Orange:</span> Kaons</li>
+                            <li><span style="color: #8000ff;">🟣 Purple:</span> Protons</li>
+                        </ul>
+                        
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">🏗️ Detector Layers</h3>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><span style="color: #4169E1;">Blue:</span> Inner Detector (tracking)</li>
+                            <li><span style="color: #32CD32;">Green:</span> EM Calorimeter (electrons/photons)</li>
+                            <li><span style="color: #FF6347;">Red:</span> Hadronic Calorimeter (hadrons)</li>
+                            <li><span style="color: #9370DB;">Purple:</span> Muon System (muons only)</li>
+                        </ul>
+                        
+                        <h3 style="color: #ffff00; margin: 15px 0 10px 0;">📁 File Upload</h3>
+                        <p style="margin: 0 0 15px 0;">Upload your own particle physics data in JSON format. The file should contain an array of particles with trajectory points and physics properties.</p>
+                        
+                        <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+                            <p style="color: #aaa; font-size: 12px;">ATLAS Particle Viewer v2.0 - Interactive 3D Physics Visualization</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', helpContent);
+            addDebugStep('Help dialog opened', 'success');
+        }
+        
+        function updateParticleFilters() {
+            const checkedTypes = Array.from(document.querySelectorAll('#particle-type-filters input:checked'))
+                .map(input => input.value);
+            
+            particleTracks.forEach(track => {
+                if (track.userData && track.userData.particleType) {
+                    const shouldShow = checkedTypes.includes(track.userData.particleType) || 
+                                     checkedTypes.includes(track.userData.particleType.replace('anti', ''));
+                    track.visible = shouldShow;
+                }
+            });
+            
+            // Update visible tracks count
+            const visibleCount = particleTracks.filter(track => track.visible).length;
+            document.getElementById('visible-tracks').textContent = Math.floor(visibleCount / 2); // Divide by 2 because we count both tracks and markers
+        }
+        
+        // Start the application
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                initApplication();
+                setupUIEventListeners();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
